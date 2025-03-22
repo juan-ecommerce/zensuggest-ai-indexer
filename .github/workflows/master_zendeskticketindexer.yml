@@ -35,7 +35,15 @@ jobs:
           source venv/bin/activate
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create .python_packages directory and install dependencies there
+        run: |
+          mkdir -p ZendeskTicketIndexer/.python_packages/lib/site-packages
+          pip install -r requirements.txt --target ZendeskTicketIndexer/.python_packages/lib/site-packages
+          python ZendeskTicketIndexer/install_dependencies.py
 
       # Optional: Add step to run tests here
 
