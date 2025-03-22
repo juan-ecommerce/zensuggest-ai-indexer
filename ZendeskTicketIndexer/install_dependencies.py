@@ -30,8 +30,15 @@ def install_dependencies():
     
     # Check if requirements.txt exists
     if not os.path.exists(requirements_path):
-        logging.error(f"requirements.txt not found at {requirements_path}")
-        return False
+        # Try to use the parent directory's requirements.txt as fallback
+        parent_dir = os.path.abspath(os.path.join(dir_path, os.pardir))
+        parent_requirements_path = os.path.join(parent_dir, "requirements.txt")
+        if os.path.exists(parent_requirements_path):
+            requirements_path = parent_requirements_path
+            logging.info(f"Using parent directory requirements.txt at {requirements_path}")
+        else:
+            logging.error(f"requirements.txt not found at {requirements_path} or parent directory")
+            return False
     
     # Install dependencies to .python_packages directory
     logging.info(f"Installing dependencies from {requirements_path} to {python_packages_dir}")

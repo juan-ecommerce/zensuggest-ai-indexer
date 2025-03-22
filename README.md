@@ -1,15 +1,23 @@
 # ZenSuggest AI Indexer
 
-This repository contains the Azure Function that indexes Zendesk tickets into a Supabase database for use with the ZenSuggest AI application.
+This repository contains an Azure Function that indexes Zendesk tickets into a Supabase database for use with the ZenSuggest AI application. The function is automatically deployed to Azure via GitHub Actions when changes are pushed to the master branch.
 
 ## Overview
 
-The ZenSuggest AI Indexer is an Azure Function that runs on a schedule to:
+The ZenSuggest AI Indexer is an Azure Function that runs on an hourly schedule to:
 
 1. Fetch tickets from Zendesk using the Zendesk API
 2. Process and chunk the ticket content
 3. Generate embeddings for each chunk using OpenAI
 4. Store the chunks and embeddings in Supabase for retrieval by the ZenSuggest AI application
+
+## Architecture
+
+- **Azure Function**: Timer-triggered function that runs hourly
+- **GitHub Actions**: Automated CI/CD pipeline for deployment to Azure
+- **Zendesk API**: Source of ticket data
+- **OpenAI API**: Used for generating embeddings
+- **Supabase**: Vector database for storing ticket chunks and embeddings
 
 ## Setup
 
@@ -18,17 +26,17 @@ The ZenSuggest AI Indexer is an Azure Function that runs on a schedule to:
 - Azure Function App set up in Azure
 - Zendesk account with API access
 - OpenAI API key
-- Supabase project with the appropriate tables
+- Supabase project with the appropriate tables (see schema below)
 
 ### Environment Variables
 
-Copy the `.env_example` file to `.env` and fill in your credentials:
+Copy the `.env_example` file to `.env` for local development:
 
 ```bash
 cp .env_example .env
 ```
 
-Required environment variables:
+Required environment variables (must be configured in Azure Function App settings for production):
 
 - `ZENDESK_SUBDOMAIN`: Your Zendesk subdomain
 - `ZENDESK_EMAIL`: Your Zendesk email
@@ -60,7 +68,7 @@ This project includes a special approach to dependency management to address iss
 
 The `install_dependencies.py` script in the `ZendeskTicketIndexer` directory installs dependencies to the `.python_packages` directory, which is where Azure Functions looks for packages when running in the cloud.
 
-To run this script:
+To run this script manually:
 
 ```bash
 cd ZendeskTicketIndexer
@@ -71,7 +79,11 @@ The Azure Function's `__init__.py` file includes code to add the `.python_packag
 
 ## Deployment
 
-This repository includes a GitHub Actions workflow that automatically deploys the Azure Function to Azure when changes are pushed to the master branch.
+### Automatic Deployment
+
+This repository includes a GitHub Actions workflow that automatically deploys the Azure Function to Azure when changes are pushed to the master branch. The workflow is defined in `.github/workflows/master_zendeskticketindexer.yml`.
+
+### Manual Deployment
 
 To deploy manually:
 
@@ -142,7 +154,13 @@ END;
 $$;
 ```
 
-## Troubleshooting
+## Monitoring and Troubleshooting
+
+### Logs
+
+The function includes comprehensive logging. You can view logs in the Azure Portal under the Function App's "Logs" section.
+
+### Common Issues
 
 If you encounter issues with dependencies not being found when the function runs in Azure:
 
