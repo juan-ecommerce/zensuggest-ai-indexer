@@ -219,8 +219,16 @@ if DEPENDENCIES_AVAILABLE:
 
     async def process_and_store_ticket(ticket: Dict[str, Any]):
         """Process a ticket and store its chunks in parallel."""
-        # Get chunks from the ticket
-        chunks = chunk_text(ticket['comments'])
+        # Check if comments is a list and join them if needed
+        if isinstance(ticket['comments'], list):
+            logging.info(f"Ticket #{ticket['id']} has {len(ticket['comments'])} comments as a list, joining them")
+            # Join the comments with a separator
+            comments_text = "\n\n---\n\n".join(ticket['comments'])
+        else:
+            comments_text = ticket['comments']
+            
+        # Get chunks from the ticket comments
+        chunks = chunk_text(comments_text)
         logging.info(f"Ticket #{ticket['id']} split into {len(chunks)} chunks")
         
         # Process chunks in parallel
