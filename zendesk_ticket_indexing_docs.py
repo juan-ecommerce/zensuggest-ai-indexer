@@ -51,43 +51,47 @@ if DEPENDENCIES_AVAILABLE:
     # Initialize OpenAI and Supabase clients
     openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     
-    # Create Supabase client with compatibility for Azure Functions environment
+    # Create Supabase client with direct initialization to avoid proxy issues
     try:
         # First try with standard initialization
-        supabase = create_client(
-            os.getenv("SUPABASE_URL"),
-            os.getenv("SUPABASE_SERVICE_KEY")
-        )
-    except TypeError as e:
-        if "unexpected keyword argument 'proxy'" in str(e):
-            # If proxy error occurs, try to import and patch the client creation
-            logging.info("Detected proxy compatibility issue with Supabase client, applying workaround")
-            from supabase._sync.client import SyncClient
-            from supabase._sync import client as supabase_client
-            
-            # Store the original method
-            original_create = supabase_client.create_client
-            
-            # Create a patched version that removes proxy settings
-            def patched_create_client(supabase_url, supabase_key, options=None):
-                if options and 'http_options' in options:
-                    # Remove proxy settings if they exist
-                    if 'proxy' in options['http_options']:
-                        del options['http_options']['proxy']
-                return original_create(supabase_url, supabase_key, options)
-            
-            # Replace the create_client function
-            supabase_client.create_client = patched_create_client
-            
-            # Try again with the patched function
-            supabase = create_client(
-                os.getenv("SUPABASE_URL"),
-                os.getenv("SUPABASE_SERVICE_KEY")
-            )
-            logging.info("Successfully created Supabase client with proxy workaround")
-        else:
-            # If it's a different error, re-raise it
-            raise
+        from supabase import create_client
+        
+        # Get Supabase credentials from environment
+        supabase_url = os.getenv("SUPABASE_URL")
+        supabase_key = os.getenv("SUPABASE_SERVICE_KEY")
+        
+        # Direct initialization of SyncClient to bypass proxy issues
+        try:
+            # Try standard client creation first
+            supabase = create_client(supabase_url, supabase_key)
+        except TypeError as e:
+            if "unexpected keyword argument 'proxy'" in str(e):
+                logging.info("Using direct Supabase client initialization to avoid proxy issues")
+                # Import necessary components for direct initialization
+                from supabase._sync.client import SyncClient
+                from postgrest._sync.client import SyncQueryBuilder
+                
+                # Create client directly without using create_client function
+                supabase = SyncClient(supabase_url, supabase_key, {})
+                
+                # Initialize the client's components manually if needed
+                if not hasattr(supabase, 'table'):
+                    logging.info("Initializing Supabase table interface manually")
+                    schema = "public"
+                    rest_url = f"{supabase_url}/rest/v1"
+                    supabase.postgrest = SyncQueryBuilder(rest_url, {
+                        "Authorization": f"Bearer {supabase_key}",
+                        "apikey": supabase_key
+                    }, schema)
+                    
+                    # Add table method
+                    supabase.table = lambda table_name: supabase.postgrest.from_(table_name)
+            else:
+                # If it's a different error, re-raise it
+                raise
+    except Exception as e:
+        logging.error(f"Failed to initialize Supabase client: {str(e)}")
+        raise
 
     # Cache for Zendesk tickets
     _zendesk_tickets_cache = None
