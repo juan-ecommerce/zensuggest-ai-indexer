@@ -50,10 +50,44 @@ except ImportError:
 if DEPENDENCIES_AVAILABLE:
     # Initialize OpenAI and Supabase clients
     openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    supabase = create_client(
-        os.getenv("SUPABASE_URL"),
-        os.getenv("SUPABASE_SERVICE_KEY")
-    )
+    
+    # Create Supabase client with compatibility for Azure Functions environment
+    try:
+        # First try with standard initialization
+        supabase = create_client(
+            os.getenv("SUPABASE_URL"),
+            os.getenv("SUPABASE_SERVICE_KEY")
+        )
+    except TypeError as e:
+        if "unexpected keyword argument 'proxy'" in str(e):
+            # If proxy error occurs, try to import and patch the client creation
+            logging.info("Detected proxy compatibility issue with Supabase client, applying workaround")
+            from supabase._sync.client import SyncClient
+            from supabase._sync import client as supabase_client
+            
+            # Store the original method
+            original_create = supabase_client.create_client
+            
+            # Create a patched version that removes proxy settings
+            def patched_create_client(supabase_url, supabase_key, options=None):
+                if options and 'http_options' in options:
+                    # Remove proxy settings if they exist
+                    if 'proxy' in options['http_options']:
+                        del options['http_options']['proxy']
+                return original_create(supabase_url, supabase_key, options)
+            
+            # Replace the create_client function
+            supabase_client.create_client = patched_create_client
+            
+            # Try again with the patched function
+            supabase = create_client(
+                os.getenv("SUPABASE_URL"),
+                os.getenv("SUPABASE_SERVICE_KEY")
+            )
+            logging.info("Successfully created Supabase client with proxy workaround")
+        else:
+            # If it's a different error, re-raise it
+            raise
 
     # Cache for Zendesk tickets
     _zendesk_tickets_cache = None
