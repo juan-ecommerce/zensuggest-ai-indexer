@@ -209,13 +209,20 @@ if DEPENDENCIES_AVAILABLE:
             "embedding": chunk.embedding
         }
         
-        # Insert into Supabase
-        response = supabase.table("zendesk_tickets").insert(chunk_dict).execute()
-        
-        # Check for errors
-        if hasattr(response, 'error') and response.error:
-            logging.error(f"Error inserting chunk: {response.error}")
-            raise Exception(f"Supabase error: {response.error}")
+        try:
+            # Use upsert instead of insert to handle duplicate records
+            # This will update the record if it exists or insert it if it doesn't
+            response = supabase.table("zendesk_tickets").upsert(chunk_dict).execute()
+            
+            # Check for errors
+            if hasattr(response, 'error') and response.error:
+                logging.error(f"Error upserting chunk: {response.error}")
+                raise Exception(f"Supabase error: {response.error}")
+        except Exception as e:
+            logging.error(f"Error upserting chunk: {str(e)}")
+            # Continue processing other chunks even if one fails
+            # This prevents the entire batch from failing due to one error
+            pass
 
     async def process_and_store_ticket(ticket: Dict[str, Any]):
         """Process a ticket and store its chunks in parallel."""
