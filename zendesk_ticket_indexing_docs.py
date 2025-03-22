@@ -210,16 +210,25 @@ if DEPENDENCIES_AVAILABLE:
         }
         
         try:
-            # Use upsert instead of insert to handle duplicate records
-            # This will update the record if it exists or insert it if it doesn't
-            response = supabase.table("zendesk_tickets").upsert(chunk_dict).execute()
+            # First check if the record exists
+            response = supabase.table("zendesk_tickets").select("*").eq("url", chunk.url).eq("chunk_number", chunk.chunk_number).execute()
+            
+            if response.data and len(response.data) > 0:
+                # Record exists, update it
+                logging.info(f"Updating existing record for {chunk.url}, chunk {chunk.chunk_number}")
+                response = supabase.table("zendesk_tickets").update(chunk_dict).eq("url", chunk.url).eq("chunk_number", chunk.chunk_number).execute()
+            else:
+                # Record doesn't exist, insert it
+                logging.info(f"Inserting new record for {chunk.url}, chunk {chunk.chunk_number}")
+                response = supabase.table("zendesk_tickets").insert(chunk_dict).execute()
             
             # Check for errors
             if hasattr(response, 'error') and response.error:
-                logging.error(f"Error upserting chunk: {response.error}")
+                logging.error(f"Error storing chunk: {response.error}")
                 raise Exception(f"Supabase error: {response.error}")
+                
         except Exception as e:
-            logging.error(f"Error upserting chunk: {str(e)}")
+            logging.error(f"Error storing chunk: {str(e)}")
             # Continue processing other chunks even if one fails
             # This prevents the entire batch from failing due to one error
             pass
